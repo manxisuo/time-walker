@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0}
 html,body{height:100%;overflow:hidden;background:#000;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;color:#fff;user-select:none;-webkit-user-select:none}
-canvas{display:block}
+canvas{display:block;touch-action:none}
 #fx{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle,transparent 35%,rgba(170,215,255,.75) 100%)}
 #flash{position:fixed;inset:0;pointer-events:none;opacity:0;background:#fff}
 #title{position:fixed;left:0;right:0;top:calc(14vh + env(safe-area-inset-top));text-align:center;pointer-events:none;opacity:0}
@@ -15,19 +15,24 @@ canvas{display:block}
 #title b{display:block;font-size:clamp(34px,8vw,84px);letter-spacing:.18em;text-shadow:0 0 24px currentColor,0 0 60px rgba(255,255,255,.4)}
 #title span{display:block;margin-top:10px;font-size:clamp(14px,2.4vw,22px);letter-spacing:.3em;opacity:.85}
 @keyframes tt{0%{opacity:0;transform:scale(1.15);filter:blur(8px)}15%{opacity:1;transform:scale(1);filter:none}75%{opacity:1}100%{opacity:0}}
-#hud{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0 12px}
-#hud button{font:inherit;font-size:14px;height:42px;padding:0 16px;border:1px solid rgba(255,255,255,.35);border-radius:21px;background:rgba(10,10,25,.55);color:#fff;cursor:pointer;backdrop-filter:blur(8px)}
+#hud{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 max(6px,env(safe-area-inset-left)) 0 max(6px,env(safe-area-inset-right))}
+#hud-btns{display:flex;gap:8px;flex-shrink:0}
+#hud button{font:inherit;font-size:14px;height:38px;padding:0 14px;border:1px solid rgba(255,255,255,.35);border-radius:19px;background:rgba(10,10,25,.55);color:#fff;cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap;flex-shrink:0}
 #hud button.on{background:#fff;color:#111}
 #hud button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#chips{display:flex;gap:5px;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 4px;scroll-snap-type:x mandatory;touch-action:pan-x}
+#chips::-webkit-scrollbar{display:none}
+#chips button{font-size:12px;height:32px;padding:0 8px;scroll-snap-align:start;min-width:max-content;touch-action:manipulation}
 #cn{position:fixed;right:max(16px,env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));font-size:20px;font-weight:700;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .3s}
 #tip{position:fixed;left:max(16px,env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));font-size:12px;opacity:.7;text-shadow:0 1px 4px #000}
+@media(max-width:480px){#tip{display:none}}
 </style>
 </head>
 <body>
 <div id="fx"></div><div id="flash"></div>
 <div id="title"><b></b><span></span></div>
 <div id="cn"></div><div id="tip">拖动画面转动视角　←→ 切换世界　空格暂停</div>
-<div id="hud"><button id="bp">暂停</button><button id="bs">🔇 开启音效</button><span id="chips" style="display:flex;gap:8px;overflow-x:auto;max-width:100%;scrollbar-width:none"></span></div>
+<div id="hud"><div id="hud-btns"><button id="bp">暂停</button><button id="bs">🔇 开启音效</button></div><div id="chips"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
@@ -59,15 +64,16 @@ const E=[
 ];
 const R=n=>{const s=Math.sin(n*12.9898)*43758.5453;return s-Math.floor(s)};
 const $=id=>document.getElementById(id);
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.72;
+const isMobileDevice=('ontouchstart'in window||navigator.maxTouchPoints>0)&&window.innerWidth<768;
+const renderer=new THREE.WebGLRenderer({antialias:!isMobileDevice});
+renderer.setPixelRatio(Math.min(devicePixelRatio,isMobileDevice?1.5:2));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.72;
 document.body.prepend(renderer.domElement);
 const scene=new THREE.Scene();scene.fog=new THREE.Fog(0,15,170);scene.background=new THREE.Color();
 const cam=new THREE.PerspectiveCamera(62,1,.1,1200);
 const hemi=new THREE.HemisphereLight(0xffffff,0x222233,.55),dir=new THREE.DirectionalLight(0xffffff,1.1);
 scene.add(hemi,dir,dir.target);
 const composer=new THREE.EffectComposer(renderer);composer.addPass(new THREE.RenderPass(scene,cam));
-const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(1,1),.9,.5,.6);composer.addPass(bloom);
+const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(1,1),isMobileDevice?.6:.9,.5,isMobileDevice?.8:.6);composer.addPass(bloom);
 function resize(){renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
 addEventListener('resize',resize);resize();
 
@@ -454,7 +460,8 @@ trail.geometry.setAttribute('color',new THREE.BufferAttribute(new Float32Array(N
 /* ---------- 状态 ---------- */
 let z=-2,t=0,phase=0,paused=false,target=null,warp=0,idx=-1,yaw=0,pitch=0,flash=0;
 const cv3=new THREE.Vector3(),cE=['bg','gr','hs','dl','pc','coat'].reduce((o,k)=>(o[k]=new THREE.Color(),o),{}),tmp=new THREE.Color();
-chips=$('chips');chips.innerHTML=E.map((e,i)=>`<button data-i="${i}">${e.n}</button>`).join('');
+const SN=['星夜','霓虹','金字塔','极光','月球','星海','深海','森林','像素','琴键','素描','火山','齿轮','梦境','糖果','云端','水墨','微观'];
+chips=$('chips');const useShort=window.innerWidth<500;chips.innerHTML=E.map((e,i)=>`<button data-i="${i}">${useShort?SN[i]:e.n}</button>`).join('');
 const mix=(k,i,j,w)=>cE[k].set(E[i][k]).lerp(tmp.set(E[j][k]),w);
 function showTitle(i){A.chime(i);const T=$('title');T.querySelector('b').textContent=E[i].n;T.querySelector('b').style.color=E[i].pc;T.querySelector('span').textContent=E[i].s;T.classList.remove('show');void T.offsetWidth;T.classList.add('show');[...chips.children].forEach((b,k)=>b.classList.toggle('on',k===i));chips.children[i].scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'})}
 function kick(f){warp=1;flash=f;A.whoosh(f)}
@@ -462,9 +469,11 @@ function goTo(i){if(HID)return;target=-(i*L+10);kick(.5)}
 $('bp').onclick=()=>{paused=!paused;A.blip(paused);$('bp').textContent=paused?'继续':'暂停'};
 chips.onclick=e=>{const b=e.target.closest('button');if(b)goTo(+b.dataset.i)};
 addEventListener('keydown',e=>{const c=Math.max(0,idx);if(e.key=='ArrowRight')goTo((c+1)%NS);else if(e.key=='ArrowLeft')goTo((c+NS-1)%NS);else if(e.key==' '){$('bp').click();e.preventDefault()}});
-let drag=null;addEventListener('pointerdown',e=>{if(!e.target.closest('#hud'))drag=[e.clientX,e.clientY,yaw,pitch]});
-addEventListener('pointermove',e=>{if(drag){yaw=drag[2]-(e.clientX-drag[0])*.006;pitch=Math.max(-.4,Math.min(.7,drag[3]+(e.clientY-drag[1])*.004))}});
+let drag=null,isMobile='ontouchstart'in window||navigator.maxTouchPoints>0;
+addEventListener('pointerdown',e=>{if(!e.target.closest('#hud')){drag=[e.clientX,e.clientY,yaw,pitch,e.pointerType];e.preventDefault()}},{passive:false});
+addEventListener('pointermove',e=>{if(drag){e.preventDefault();const sens=drag[4]==='touch'?.018:.006,pitchSens=drag[4]==='touch'?.012:.004;yaw=drag[2]-(e.clientX-drag[0])*sens;pitch=Math.max(-.4,Math.min(.7,drag[3]+(e.clientY-drag[1])*pitchSens))}},{passive:false});
 addEventListener('pointerup',()=>drag=null);
+addEventListener('pointercancel',()=>drag=null);
 
 /* ---------- 音效（WebAudio 程序合成） ---------- */
 const A={ctx:null,on:true,ps:false,ph:0,ev:5,ni:0,nt:0,tt:0,ti:0,gq:2,MEL:[523,659,784,659,880,784,659,587,523,659,784,1047,988,880,784,0,698,880,1047,880,784,659,587,659,698,784,880,988,1047,784,523,0],BAS:[131,110,87,98,131,110,87,98],
